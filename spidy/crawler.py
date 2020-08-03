@@ -16,6 +16,8 @@ from copy import copy
 from lxml import etree
 from lxml.html import iterlinks, resolve_base_href
 from reppy.robots import Robots
+from urllib.parse import urlparse
+
 
 try:
     from spidy import __version__
@@ -203,7 +205,7 @@ class RobotsIndex(object):
         return len(self.index)
 
     def _lookup(self, url):
-        hostname = urllib.parse.urlparse(url).hostname
+        hostname = urlparse(url).hostname
         if hostname not in self.index.keys():
             with self.lock:
                 # check again to be sure
@@ -213,8 +215,10 @@ class RobotsIndex(object):
         return self.index[hostname].allowed(url)
 
     def _remember(self, url):
-        urlparsed = urllib.parse.urlparse(url)
+        urlparsed = urlparse(url)
+        print(urlparsed)
         robots_url = url.replace(urlparsed.path, '/robots.txt')
+        print(robots_url)
         write_log('ROBOTS',
                   'Reading robots.txt file at: {0}'.format(robots_url),
                   package='reppy')
@@ -434,8 +438,8 @@ def check_link(item, robots_index=None):
     # Links longer than 255 characters are usually too long for the filesystem to handle.
     if robots_index and not robots_index.is_allowed(item):
         return True
-    if RESTRICT:
-        if DOMAIN not in item:
+    # Is always restricted to search in main domain, not outside
+    if DOMAIN not in item:
             return True
     if len(item) < 10 or len(item) > 255:
         return True
@@ -645,6 +649,17 @@ def zip_saved_files(out_file_name, directory):
     makedirs(directory)  # Creates empty folder of same name
     write_log('SAVE', 'Zipped documents to {0}.zip'.format(out_file_name))
 
+def get_domain(START):
+    """
+        Get domain from START var
+    """
+    domain = ''
+    parse = urlparse(START[0])
+    domain += parse.scheme + "://"
+    domain += parse.netloc
+    print (domain)
+    return domain
+
 
 ########
 # INIT #
@@ -797,7 +812,7 @@ KILL_LIST = [
 ]
 
 # Links to start crawling if the TODO list is empty
-START = ['https://en.wikipedia.org/wiki/Main_Page']
+START = ['']
 
 # Counter variables
 COUNTER = Counter(0)
@@ -830,6 +845,7 @@ THREAD_LIST = []
 save_mutex = threading.Lock()
 FINISHED = False
 THREAD_RUNNING = True
+
 
 
 def init():
@@ -866,23 +882,29 @@ def init():
             handle_invalid_input()
 
     if USE_CONFIG:
-        try:
-            write_log('INIT', 'Config file name:', status='INPUT')
-            input_ = input()
-            if input_[-4:] == '.cfg':
-                file_path = path.join(PACKAGE_DIR, 'config', input_)
-            else:
-                file_path = path.join(PACKAGE_DIR, 'config', '{0}.cfg'.format(input_))
-            write_log('INIT', 'Loading configuration settings from {0}'.format(file_path))
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
-                for line in file.readlines():
-                    exec(line, globals())
-        except FileNotFoundError:
-            write_log('INPUT', 'Config file not found.', status='ERROR')
-            raise FileNotFoundError()
-        except Exception:
-            write_log('INPUT', 'Please name a valid .cfg file.', status='ERROR')
-            raise Exception()
+        #try:
+        write_log('INIT', 'Config file name:', status='INPUT')
+        input_ = input()
+        if input_[-4:] == '.cfg':
+            file_path = path.join(PACKAGE_DIR, 'config', input_)
+        else:
+            file_path = path.join(PACKAGE_DIR, 'config', '{0}.cfg'.format(input_))
+        write_log('INIT', 'Loading configuration settings from {0}'.format(file_path))
+        print(file_path)
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
+            for line in file.readlines():
+                exec(line, globals())
+        # Get domain or IP in order to get no others URL outside of there
+        print("----------------------------------")
+        print("DOMAIN")
+        DOMAIN = get_domain(START)
+        print("-----------------------------------")
+        #except FileNotFoundError:
+        #    write_log('INPUT', 'Config file not found.', status='ERROR')
+        #    raise FileNotFoundError()
+        #except Exception:
+        #    write_log('INPUT', 'Please name a valid .cfg file.', status='ERROR')
+        #    raise Exception()
 
     else:
         write_log('INIT', 'Please enter the following arguments. Leave blank to use the default values.')
