@@ -215,10 +215,9 @@ class RobotsIndex(object):
         return self.index[hostname].allowed(url)
 
     def _remember(self, url):
+        # Solved issue when path was just '/'
         urlparsed = urlparse(url)
-        print(urlparsed)
-        robots_url = url.replace(urlparsed.path, '/robots.txt')
-        print(robots_url)
+        robots_url = urlparsed.scheme + "://" + urlparsed.netloc + '/robots.txt'
         write_log('ROBOTS',
                   'Reading robots.txt file at: {0}'.format(robots_url),
                   package='reppy')
